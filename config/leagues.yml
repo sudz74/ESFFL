@@ -1,0 +1,13 @@
+# Registry of leagues. Source of truth for what the pipeline pulls.
+yahoo:
+  login: edsudik
+  seed: {season: 2021, league_id: 46149}   # chain is walked via renew/renewed from here
+  seasons: [2006, 2024]                    # inclusive
+  include_keys: []                         # extra league_keys to deep-pull, e.g. the parallel overlap-year league
+sleeper:
+  username: sudz74
+  seed_league_id: "1314977605023195136"    # chain is walked via previous_league_id (phase 2)
+overlap:
+  season: null                             # fill in once the coverage report shows it
+  platform: yahoo
+  league_ids: []
