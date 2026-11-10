@@ -1,4 +1,5 @@
 .env
+data/private/
 .yahoo_token.json
 .venv/
 __pycache__/
