@@ -16,5 +16,6 @@ python -m esffl.yahoo.coverage --discover-only   # game keys, chain, all leagues
 python -m esffl.yahoo.coverage                   # deep pull + reports/yahoo_coverage.{csv,md}
 python tests/test_yahoo_parse.py                 # offline parser tests
 ```
-Raw responses land in `data/raw/yahoo/{season}/{league_id}/` with emails removed and manager
-guids replaced by a one-way hash (`guid_h`). Existing snapshots are never overwritten unless `--refresh`.
+Committed raw responses land in `data/raw/yahoo/{season}/{league_id}/` with emails removed and manager
+guids replaced by a one-way hash (`guid_h`). Unscrubbed copies and `yahoo_identities.csv` (email, guid,
+nickname per team-season) stay in `data/private/` (gitignored). Existing snapshots are never overwritten unless `--refresh`.

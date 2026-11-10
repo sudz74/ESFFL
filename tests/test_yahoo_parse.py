@@ -1,6 +1,6 @@
 """Offline tests with synthetic payloads shaped like Yahoo's JSON. Run: PYTHONPATH=src python tests/test_yahoo_parse.py"""
 from esffl.yahoo import client
-from esffl.yahoo.coverage import summarize
+from esffl.yahoo.coverage import summarize, identities
 
 STANDINGS = {"fantasy_content": {"league": [
     {"league_key": "338.l.46149", "name": "ESFFL", "num_teams": 2, "season": "2021"},
@@ -47,7 +47,20 @@ def test_summarize():
     assert r["weeks_with_scores"] == 1 and r["status"] == "PARTIAL"  # week 2 unscored
 
 
+def test_identities():
+    flat = client.flatten(STANDINGS)  # unscrubbed
+    pulled = {"private_standings": flat}
+    rows = identities(2021, "338.l.46149", pulled)
+    assert len(rows) == 2
+    assert rows[0]["email"] == "a@b.c" and rows[0]["guid"] == "ABCDEF" and rows[0]["guid_h"]
+    assert rows[1]["guid_h"] == ""
+    assert summarize(2021, "338.l.46149", "chain", {"errors": [], "boards": {}, "weeks": (1, 1),
+        "league": {"num_teams": "2"}, "settings": {}, "standings": client.flatten(client.scrub(STANDINGS)),
+        "private_standings": flat})["managers_with_email"] == 1
+
+
 if __name__ == "__main__":
+    test_identities()
     test_scrub_and_flatten()
     test_summarize()
     print("ok")

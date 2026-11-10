@@ -95,6 +95,7 @@ def pull_league(season, key, refresh):
     res["league"] = first(f(f"league/{key}", "league") or {}, "league")
     res["settings"] = first(f(f"league/{key}/settings", "settings") or {}, "settings")
     res["standings"] = f(f"league/{key}/standings", "standings") or {}
+    res["private_standings"] = client.load_private(scope, "standings") or {}
     f(f"league/{key}/teams", "teams")
     lg = res["league"]
     start = to_int(lg.get("start_week"), 1)
@@ -105,6 +106,23 @@ def pull_league(season, key, refresh):
         if sb:
             res["boards"][w] = sb
     return res
+
+
+def identities(season, key, pulled):
+    """Local-only lookup rows (email/guid/nickname per team) for manual owner identification."""
+    _, lid = key_parts(key)
+    rows = []
+    for t in find_all(pulled.get("private_standings") or {}, "team"):
+        for m in find_all(t, "manager") or [{}]:
+            rows.append({
+                "season": season, "league_id": lid, "team_key": t.get("team_key", ""),
+                "team_id": t.get("team_id", ""), "team_name": t.get("name", ""),
+                "manager_id": m.get("manager_id", ""), "nickname": m.get("nickname", ""),
+                "email": m.get("email", ""), "guid": m.get("guid", ""),
+                "is_commissioner": m.get("is_commissioner", ""),
+                "is_current_login": m.get("is_current_login", ""),
+                "guid_h": client.scrub({"guid": m.get("guid")}).get("guid_h") or ""})
+    return rows
 
 
 def summarize(season, key, in_chain, pulled):
@@ -118,6 +136,8 @@ def summarize(season, key, in_chain, pulled):
             with_record += 1
         if any(m.get("guid_h") for m in find_all(t, "manager")):
             guid_vis += 1
+    email_vis = sum(1 for t in find_all(pulled.get("private_standings") or {}, "team")
+                    if any(m.get("email") for m in find_all(t, "manager")))
     scored_weeks = matchups = playoff = consol = 0
     for w, sb in pulled["boards"].items():
         wk_scored = 0
@@ -142,7 +162,7 @@ def summarize(season, key, in_chain, pulled):
     return {
         "season": season, "league_key": key, "name": lg.get("name", ""), "in_chain": in_chain,
         "num_teams_meta": n_teams, "teams_in_standings": len(teams), "rows_with_record": with_record,
-        "managers_with_guid": guid_vis, "weeks_expected": expected, "weeks_with_scores": scored_weeks,
+        "managers_with_guid": guid_vis, "managers_with_email": email_vis, "weeks_expected": expected, "weeks_with_scores": scored_weeks,
         "matchups_scored": matchups, "playoff_matchups": playoff, "consolation_matchups": consol,
         "playoff_start_week": st.get("playoff_start_week", ""), "num_playoff_teams": st.get("num_playoff_teams", ""),
         "is_finished": lg.get("is_finished", ""), "status": status, "errors": " | ".join(pulled["errors"])[:300],
@@ -208,13 +228,22 @@ def main():
     if args.discover_only:
         return
 
-    rows = []
+    rows, ident = [], []
     for key, (s, tag) in sorted(targets.items(), key=lambda kv: (kv[1][0] or 0, kv[0])):
         print(f"pulling {s} {key} [{tag}] ...")
         pulled = pull_league(s, key, args.refresh)
         row = summarize(s, key, tag, pulled)
         rows.append(row)
+        ident.extend(identities(s, key, pulled))
         print(f"   -> {row['status']}: {row['teams_in_standings']} teams, {row['weeks_with_scores']}/{row['weeks_expected']} weeks")
+
+    if ident:
+        Path("data/private").mkdir(parents=True, exist_ok=True)
+        with open("data/private/yahoo_identities.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(ident[0]))
+            w.writeheader()
+            w.writerows(ident)
+        print("Wrote data/private/yahoo_identities.csv (local only, gitignored)")
 
     Path("reports").mkdir(exist_ok=True)
     cols = list(rows[0]) if rows else []
@@ -224,7 +253,7 @@ def main():
         w.writerows(rows)
     with open("reports/yahoo_coverage.md", "w") as fh:
         short = ["season", "league_key", "name", "in_chain", "teams_in_standings", "rows_with_record",
-                 "managers_with_guid", "weeks_with_scores", "weeks_expected", "matchups_scored", "status"]
+                 "managers_with_guid", "managers_with_email", "weeks_with_scores", "weeks_expected", "matchups_scored", "status"]
         fh.write("| " + " | ".join(short) + " |\n|" + "---|" * len(short) + "\n")
         for r in rows:
             fh.write("| " + " | ".join(str(r[c]) for c in short) + " |\n")

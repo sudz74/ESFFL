@@ -14,7 +14,8 @@ import requests
 from . import auth
 
 BASE = "https://fantasysports.yahooapis.com/fantasy/v2"
-RAW_ROOT = Path("data/raw/yahoo")
+RAW_ROOT = Path("data/raw/yahoo")              # scrubbed, committed
+PRIVATE_ROOT = Path("data/private/raw/yahoo")  # unscrubbed, gitignored
 PAUSE = 0.25  # seconds between live calls
 
 
@@ -107,7 +108,18 @@ def fetch(path, scope, name, refresh=False):
     f = RAW_ROOT / scope / f"{name}.json"
     if f.exists() and not refresh:
         return flatten(json.loads(f.read_text()))
-    raw = scrub(_live_get(path))
+    live = _live_get(path)
+    # Unscrubbed copy stays local (gitignored) so you can identify owners by email/guid.
+    p = PRIVATE_ROOT / scope / f"{name}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(live, indent=1, sort_keys=True))
+    raw = scrub(live)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(raw, indent=1, sort_keys=True))
     return flatten(raw)
+
+
+def load_private(scope, name):
+    """Unscrubbed flattened response, or None if there is no local private copy."""
+    p = PRIVATE_ROOT / scope / f"{name}.json"
+    return flatten(json.loads(p.read_text())) if p.exists() else None
