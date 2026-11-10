@@ -1,0 +1,8 @@
+.env
+.yahoo_token.json
+.venv/
+__pycache__/
+*.pyc
+*.sqlite
+*.duckdb
+.DS_Store
